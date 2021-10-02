@@ -25,9 +25,9 @@ kak-escape() {
 }
 
 ensure-env() {
-    # Exit program if $session is not set.
-    if test "$session" = ''; then
-        echo 'kak $session not set' >&2
+    # Exit program if $KAKOUNE_SESSION is not set.
+    if test "$KAKOUNE_SESSION" = ''; then
+        echo 'kak $KAKOUNE_SESSION not set' >&2
         exit
     fi
 }
@@ -37,8 +37,8 @@ function kak-defs {
     echo '
         def connect -override -params 1.. %{
             %arg{1} bash -c %{
-                export session=$1
-                export client=$2
+                export KAKOUNE_SESSION=$1
+                export KAKOUNE_CLIENT=$2
                 cd $3
                 shift 4
                 [ "$1" ] && "$@" || "$SHELL"
@@ -62,30 +62,30 @@ function kak-defs {
 }
 
 function env {
-    # Print the current $session and $client to stdout.
-    echo session: "$session"
-    echo client: "$client"
+    # Print the current $KAKOUNE_SESSION and $KAKOUNE_CLIENT to stdout.
+    echo session: "$KAKOUNE_SESSION"
+    echo client: "$KAKOUNE_CLIENT"
 }
 
 function raw-send {
-    # Evaluate kak script from stdin in $session. Run in $client if set.
+    # Evaluate kak script from stdin in $KAKOUNE_SESSION. Run in $KAKOUNE_CLIENT if set.
     ensure-env
     script=$(mktemp --suffix=-krc-raw-send)
     cat > "$script"
     eval_flags=""
-    if [[ -n $client ]]; then
-        eval_flags="-try-client $client"
+    if [[ -n $KAKOUNE_CLIENT ]]; then
+        eval_flags="-try-client $KAKOUNE_CLIENT"
     fi
     echo "
         try %{eval $eval_flags %sh{cat $script; rm $script}} catch %{
             echo -debug krc: %val{error}
             eval $eval_flags %{echo -markup {Error}krc: %val{error}}
         }
-    " | kak -p "$session"
+    " | kak -p "$KAKOUNE_SESSION"
 }
 
 function raw-send-sync {
-    # Evaluate kak script from stdin in $session, waiting for completion. Run in $client if set. Any errors are written on stderr.
+    # Evaluate kak script from stdin in $KAKOUNE_SESSION, waiting for completion. Run in $KAKOUNE_CLIENT if set. Any errors are written on stderr.
     d=$(mktemp -d --suffix=-krc-raw-send-sync)
     trap "rm -rf $d" EXIT
     script="$d/script"
@@ -95,7 +95,7 @@ function raw-send-sync {
     fifo="$d/fifo"
     mkfifo "$fifo"
     echo -e "
-        try %{eval %sh{cat $script}
+        try %{eval %file{$script}
             echo -to-file $fifo done
         } catch %{
             echo -to-file $err %val{error} '\n'
@@ -108,41 +108,51 @@ function raw-send-sync {
 }
 
 function send {
-    # Run one kak command in $session, in $client if set.
+    # Run one kak command in $KAKOUNE_SESSION, in $KAKOUNE_CLIENT if set.
     kak-escape "$@" | raw-send
 }
 
 function send-fg {
-    # Focus the $client and run one kak command in $session.
+    # Focus the $KAKOUNE_CLIENT and run one kak command in $KAKOUNE_SESSION.
     { echo focus; kak-escape "$@"; } | raw-send
 }
 
 function send-sync {
-    # Run one kak command in $session (in $client if set) and wait for the result.
+    # Run one kak command in $KAKOUNE_SESSION (in $KAKOUNE_CLIENT if set) and wait for the result.
     kak-escape "$@" | raw-send-sync
 }
 
 function get {
-    # Print the echo of arguments in kak $session on stdout. Run in $client if set.
+    # Print the echo of arguments in kak $KAKOUNE_SESSION on stdout. Run in $KAKOUNE_CLIENT if set.
     out=$(mktemp --suffix=-krc-get)
     trap "rm -rf $out" EXIT
     touch "$out"
-    echo echo -to-file "$out" "$@" | raw-send-sync
-    cat "$out"
+    echo echo -quoting shell -to-file "$out" "$@" | raw-send-sync
+    cat "$out" | xargs -n1
 }
 
 function attach {
-    # Start a new kak client in $session.
+    # Start a new kak client in $KAKOUNE_SESSION.
     ensure-env
-    kak -c "$session" "$@"
+    kak -c "$KAKOUNE_SESSION" "$@"
 }
 
 function attach-with {
-    # Start a new kak client in $session, running the argument kak command at startup.
+    # Start a new kak client in $KAKOUNE_SESSION, running the argument kak command at startup.
     ensure-env
     script=$(mktemp --suffix=-krc-attach-with)
     kak-escape "$@" > "$script"
-    kak -c "$session" -e "eval %sh{cat $script; rm $script}"
+    kak -c "$KAKOUNE_SESSION" -e "eval %sh{cat $script; rm $script}"
+}
+
+function edit {
+    ensure-env
+    send edit "$@"
+}
+
+function open {
+    ensure-env
+    send-fg edit "$@"
 }
 
 if [[ $(type -t -- "$1") == 'function' ]]; then

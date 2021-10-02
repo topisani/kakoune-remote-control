@@ -1,10 +1,10 @@
 #!/bin/sh
 
 function kak {
-    test -n "$session" && krc attach "$@" || command kak "$@"
+    test -n "$KAKOUNE_SESSION" && krc attach "$@" || command kak "$@"
 }
 
-function man { test -n "$session" && krc send-fg man "$@" || kak -e "man $*"; }
+function man { test -n "$KAKOUNE_SESSION" && krc send-fg man "$@" || kak -e "man $*"; }
 function edit { krc send-fg edit "$@"; }
 
 function val { krc get "%val[$1]"; }
