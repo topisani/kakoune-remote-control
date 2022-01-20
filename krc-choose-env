@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/sh
+
 command kak -clear
 sessions=$(command kak -l)
 blank=""
@@ -6,14 +7,14 @@ input=""
 for KAKOUNE_SESSION in $sessions; do
     export KAKOUNE_SESSION
     pwd=$(krc get %sh[pwd])
-    eval set -- $(krc get -quoting shell %val[client_list])
+    eval set -- $(krc get %val[client_list])
     for KAKOUNE_CLIENT; do
         export KAKOUNE_CLIENT
-        printf -v blank '%s\n%s' "$blank" "KAKOUNE_SESSION=$KAKOUNE_SESSION KAKOUNE_CLIENT=$KAKOUNE_CLIENT krc send info"
-        printf -v input '%s\n%s\t%s\t%s\t%s' "$input" "$KAKOUNE_SESSION" "$KAKOUNE_CLIENT" "$(krc get %val[bufname])" "$pwd"
+        blank=$(printf '%s\n%s' "$blank" "KAKOUNE_SESSION=$KAKOUNE_SESSION KAKOUNE_CLIENT=$KAKOUNE_CLIENT krc send info")
+        input=$(printf '%s\n%s\t%s\t%s\t%s' "$input" "$KAKOUNE_SESSION" "$KAKOUNE_CLIENT" "$(krc get %val[bufname])" "$pwd")
     done
 done
-printf %s "$input" | column -s $'\t' -t |
+printf %s "$input" | column -s '	' -t |
      fzf --preview "$blank; KAKOUNE_SESSION={1} KAKOUNE_CLIENT={2} krc send info -markup "'"$(toilet {1} {2} -f future)"' --preview-window down,0 |
      awk '{print "export KAKOUNE_SESSION=" $1 "; export KAKOUNE_CLIENT=" $2}'
 

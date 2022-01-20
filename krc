@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # kak remote control, reimplementation of alexherbo2's connect.kak
 
-kak-escape() {
+kak_escape() {
     # From https://github.com/alexherbo2/prelude.kak/blob/master/rc/prelude.sh
     # Original implementation by Screwtape https://github.com/mawww/kakoune/issues/3340
     for text do
@@ -24,7 +24,7 @@ kak-escape() {
     printf "\n"
 }
 
-ensure-env() {
+ensure_env() {
     # Exit program if $KAKOUNE_SESSION is not set.
     if test "$KAKOUNE_SESSION" = ''; then
         echo 'kak $KAKOUNE_SESSION not set' >&2
@@ -32,11 +32,11 @@ ensure-env() {
     fi
 }
 
-function kak-defs {
+kak_defs() {
     # Run in kak with `eval %sh{ krc kak-defs }` to define :connect.
     echo '
         def connect -override -params 1.. %{
-            %arg{1} bash -c %{
+            %arg{1} sh -c %{
                 export KAKOUNE_SESSION=$1
                 export KAKOUNE_CLIENT=$2
                 cd $3
@@ -61,19 +61,19 @@ function kak-defs {
     '
 }
 
-function env {
+env() {
     # Print the current $KAKOUNE_SESSION and $KAKOUNE_CLIENT to stdout.
     echo session: "$KAKOUNE_SESSION"
     echo client: "$KAKOUNE_CLIENT"
 }
 
-function raw-send {
+raw_send() {
     # Evaluate kak script from stdin in $KAKOUNE_SESSION. Run in $KAKOUNE_CLIENT if set.
-    ensure-env
-    script=$(mktemp --suffix=-krc-raw-send)
+    ensure_env
+    script=$(mktemp --suffix=-krc-raw_send)
     cat > "$script"
     eval_flags=""
-    if [[ -n $KAKOUNE_CLIENT ]]; then
+    if [ -n $KAKOUNE_CLIENT ]; then
         eval_flags="-try-client $KAKOUNE_CLIENT"
     fi
     echo "
@@ -84,9 +84,9 @@ function raw-send {
     " | kak -p "$KAKOUNE_SESSION"
 }
 
-function raw-send-sync {
+raw_send_sync() {
     # Evaluate kak script from stdin in $KAKOUNE_SESSION, waiting for completion. Run in $KAKOUNE_CLIENT if set. Any errors are written on stderr.
-    d=$(mktemp -d --suffix=-krc-raw-send-sync)
+    d=$(mktemp -d --suffix=-krc-raw_send_sync)
     trap "rm -rf $d" EXIT
     script="$d/script"
     cat > "$script"
@@ -94,7 +94,7 @@ function raw-send-sync {
     touch "$err"
     fifo="$d/fifo"
     mkfifo "$fifo"
-    echo -e "
+    echo "
         try %{eval %file{$script}
             echo -to-file $fifo done
         } catch %{
@@ -102,61 +102,81 @@ function raw-send-sync {
             echo -to-file $fifo done
             fail %val{error}
         }
-    " | raw-send
+    " | raw_send
     cat "$fifo" >/dev/null
     cat "$err" >&2
 }
 
-function send {
+send() {
     # Run one kak command in $KAKOUNE_SESSION, in $KAKOUNE_CLIENT if set.
-    kak-escape "$@" | raw-send
+    kak_escape "$@" | raw_send
 }
 
-function send-fg {
+send_fg() {
     # Focus the $KAKOUNE_CLIENT and run one kak command in $KAKOUNE_SESSION.
-    { echo focus; kak-escape "$@"; } | raw-send
+    { echo focus; kak_escape "$@"; } | raw_send
 }
 
-function send-sync {
+send_sync() {
     # Run one kak command in $KAKOUNE_SESSION (in $KAKOUNE_CLIENT if set) and wait for the result.
-    kak-escape "$@" | raw-send-sync
+    kak_escape "$@" | raw_send_sync
 }
 
-function get {
+get() {
     # Print the echo of arguments in kak $KAKOUNE_SESSION on stdout. Run in $KAKOUNE_CLIENT if set.
     out=$(mktemp --suffix=-krc-get)
     trap "rm -rf $out" EXIT
     touch "$out"
-    echo echo -quoting shell -to-file "$out" "$@" | raw-send-sync
+    echo echo -quoting shell -to-file "$out" "$@" | raw_send_sync
     cat "$out" | xargs -n1
 }
 
-function attach {
+attach() {
     # Start a new kak client in $KAKOUNE_SESSION.
-    ensure-env
+    ensure_env
     kak -c "$KAKOUNE_SESSION" "$@"
 }
 
-function attach-with {
+attach_with() {
     # Start a new kak client in $KAKOUNE_SESSION, running the argument kak command at startup.
-    ensure-env
+    ensure_env
     script=$(mktemp --suffix=-krc-attach-with)
-    kak-escape "$@" > "$script"
+    kak_escape "$@" > "$script"
     kak -c "$KAKOUNE_SESSION" -e "eval %sh{cat $script; rm $script}"
 }
 
-function edit {
-    ensure-env
+edit() {
+    # Edit a file in the linked kakoune client
+    ensure_env
     send edit "$@"
 }
 
-function open {
-    ensure-env
-    send-fg edit "$@"
+open() {
+    # Edit a file in the linked kakoune client and focus it.
+    ensure_env
+    send_fg edit "$@"
 }
 
-if [[ $(type -t -- "$1") == 'function' ]]; then
-    "$@"
+list_subcommands() {
+  echo kak-escape
+  echo kak-defs
+  echo env
+  echo raw-send
+  echo raw-send-sync
+  echo send
+  echo send-fg
+  echo send-sync
+  echo get
+  echo attach
+  echo attach-with
+  echo edit
+  echo open
+}
+
+if list_subcommands | grep -q "^$1\$"; then
+    fn=$(echo $1 | tr - _)
+    shift;
+    "$fn" "$@"
 else
     printf '%s\n' "kakoune-remote-control (krc)"
     printf '%s\n' ""
@@ -166,15 +186,13 @@ else
     printf '%s\n' "Where COMMAND is one of:"
 
     self=$(realpath "$0")
-    functions=$(grep -Po '^function \K[\w-]+' "$self")
-    if [[ -z "$cols" ]]; then
+    if [ -z "$cols" ]; then
         cols=$(tput cols)
     fi
-    for fn in $functions; do
-        paste <(printf '  %-13s' "$fn") <(
-            cat "$self" |
-            sed -n "/^function $fn /,/^}/p" | sed -n 's/^\s\+\#\s\+//p' |
-            fmt -w $((cols - 16))
-        ) | column -s $'\t' -t
-    done
+    list_subcommands | while read cmd; do
+        fn=$(echo $cmd | tr - _)
+        printf '  %-13s ' "$cmd"
+         sed -n "/^$fn() /,/^}/p" "$self" | sed -n 's/^\s\+\#\s\+/\n\t/p' | sed '/./,$!d' | fmt -w $((cols - 16))
+        echo
+    done | column -s '	' -t
 fi
