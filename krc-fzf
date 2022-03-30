@@ -33,8 +33,10 @@ krc_fzf_menu() {
   i=0
   cmds=( )
   labels=( )
+  i_width=$(echo -n "$#" | wc -c)
   while [[ "$#" -gt "0" ]]; do
-    labels+=( "$i: $1" ); shift
+    label=$(printf "%${i_width}d: %s" "$i" "$1"); shift
+    labels+=( "$label" )
     cmds+=( "$1" ); shift
     i=$(( i + 1 ))
   done
