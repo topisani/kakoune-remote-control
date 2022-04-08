@@ -33,9 +33,9 @@ ensure_env() {
 }
 
 kak_defs() {
-    # Run in kak with `eval %sh{ krc kak-defs }` to define :connect.
+    # Run in kak with `eval %sh{ krc kak-defs }` to define :connect and friends.
     echo '
-        def connect -override -params 1.. %{
+        def krc-connect -override -params 1.. %{
             %arg{1} sh -c %{
                 export KAKOUNE_SESSION=$1
                 export KAKOUNE_CLIENT=$2
@@ -45,19 +45,24 @@ kak_defs() {
             } -- %val{session} %val{client} %sh{pwd} %arg{@}
         }
 
-        def shell -params 1.. -override %{
+        def krc-shell -params 1.. -override %{
             nop %sh{
                 setsid "$@" < /dev/null > /dev/null 2>&1 &
             }
         }
 
-        def connect-shell -params 1.. -override %{
-            connect shell %arg{@}
+        def krc-connect-shell -params 1.. -override %{
+            krc-connect krc-shell %arg{@}
         }
 
-        def connect-terminal -params .. -override %{
-            connect terminal %arg{@}
+        def krc-connect-terminal -params .. -override %{
+            krc-connect terminal %arg{@}
         }
+
+        alias global connect          krc-connect
+        alias global shell            krc-shell
+        alias global connect-shell    krc-connect-shell
+        alias global connect-terminal krc-connect-terminal
     '
 }
 
