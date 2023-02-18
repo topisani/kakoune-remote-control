@@ -2,7 +2,7 @@
 
 krc_fzf_files() {
   fd --type file . "$@" |
-  sk --header='Select a file to open' --prompt='(f)>' |
+  fzf --header='Select a file to open' --prompt='(f)>' --preview="bat --color=always -p {}" |
   # Open files
   while read file; do
     krc edit "$file"
@@ -12,7 +12,7 @@ krc_fzf_files() {
 krc_fzf_buffers() {
   krc get %val[buflist] |
   grep -F "$*" |
-  sk --header='Select a buffer to open' --prompt='(b)>' |
+  fzf --header='Select a buffer to open' --prompt='(b)>' |
   # Open buffers
   while read name; do
     krc send buffer "$name"
@@ -41,9 +41,19 @@ krc_fzf_menu() {
     i=$(( i + 1 ))
   done
   
-  selected=$(for label in "${labels[@]}"; do echo "$label"; done | sk | cut -d: -f1)
+  selected=$(for label in "${labels[@]}"; do echo "$label"; done | fzf | cut -d: -f1)
   [[ -n "$selected" ]] || return 0
   echo ${cmds[$selected]} | krc raw-send
+}
+
+krc_fzf_jump() {
+  selected=$(fzf --header="Jump" --prompt=">")
+  IFS=':' read -r -a array <<< "$selected"
+  file=${array[0]}
+  line=${array[1]}
+  char=${array[2]}
+  echo "evaluate-commands -try-client %opt{jumpclient} -verbatim -- edit -existing -- '$file' $line $char" | krc raw-send
+  echo "try %{ focus %opt{jumpclient} }" | krc raw-send
 }
 
 "krc_fzf_$@"
