@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Automatic FZF preview position based on aspect ratio
-read -r LINES COLUMNS < <(stty size)
+read -r LINES COLUMNS < <(stty size < /dev/tty)
 if (( LINES > COLUMNS / 2 )); then
-    FZF_PREVIEW_OPTS="--preview-window=up"
+  FZF_PREVIEW_OPTS="--preview-window=up"
 else
-    FZF_PREVIEW_OPTS="--preview-window=right"
+  FZF_PREVIEW_OPTS="--preview-window=right"
 fi
 
 krc_fzf_files() {
@@ -17,10 +17,23 @@ krc_fzf_files() {
   done
 }
 
+krc_fzf__buffers_preview() {
+  bufname=$1
+  export PREVIEW_PATH=$(mktemp)
+  trap 'rm "$PREVIEW_PATH"' EXIT
+
+  echo "eval -draft %{
+    buffer '$bufname'
+    write -force '$PREVIEW_PATH'
+  }" | krc raw-send-sync
+
+  bat --color=always -p "$PREVIEW_PATH"
+}
+
 krc_fzf_buffers() {
   krc get %val[buflist] |
   grep -F "$*" |
-  fzf --header='Select a buffer to open' --prompt='(b)>' |
+  fzf --header='Select a buffer to open' --prompt='(b)>' $FZF_PREVIEW_OPTS --preview="$0 _buffers_preview {}"|
   # Open buffers
   while read name; do
     krc send buffer "$name"
