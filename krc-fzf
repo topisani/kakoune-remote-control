@@ -1,8 +1,16 @@
 #!/bin/bash
 
+# Automatic FZF preview position based on aspect ratio
+read -r LINES COLUMNS < <(stty size)
+if (( LINES > COLUMNS / 2 )); then
+    FZF_PREVIEW_OPTS="--preview-window=up"
+else
+    FZF_PREVIEW_OPTS="--preview-window=right"
+fi
+
 krc_fzf_files() {
   fd --type file . "$@" |
-  fzf --header='Select a file to open' --prompt='(f)>' --preview="bat --color=always -p {}" |
+  fzf --header='Select a file to open' --prompt='(f)>' $FZF_PREVIEW_OPTS --preview="bat --color=always -p {}" |
   # Open files
   while read file; do
     krc edit "$file"
